@@ -1,12 +1,15 @@
+import lombok.RequiredArgsConstructor;
+
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
+@RequiredArgsConstructor
 public class ShopService {
-    private ProductRepo productRepo = new ProductRepo();
-    private OrderRepo orderRepo = new OrderMapRepo();
+    private final OrderRepo orderRepo;
+    private final ProductRepo productRepo;
 
     public Order addOrder(List<String> productIds) {
         List<Product> products = new ArrayList<>();
@@ -17,17 +20,19 @@ public class ShopService {
             productToOrder.ifPresent(products::add);
         }
 
-        Order newOrder = new Order(UUID.randomUUID().toString(), products, OrderStatus.PROCESSING);
+        Order newOrder = new Order(UUID.randomUUID().toString(), Instant.now(), products, OrderStatus.PROCESSING);
 
         return orderRepo.addOrder(newOrder);
     }
 
-    public Order updateOrder(String orderId, OrderStatus status) {
-        Order order = orderRepo.getOrders().stream()
-                .filter(ord -> ord.id().equals(orderId))
-                .findFirst().orElseThrow(() -> new NullPointerException("Not found!"));
-
-        return  order.withOrderStatus(status);
+    public void updateOrder(String orderId, OrderStatus status) {
+        Order existingOrder = orderRepo.getOrderById(orderId);
+        if (existingOrder == null) {
+            throw new NullPointerException("Order not found");
+        }
+        Order updatedOrder = existingOrder.withOrderStatus(status);
+        orderRepo.removeOrder(existingOrder.id());
+        orderRepo.addOrder(updatedOrder);
     }
 
     public List<Order> getOrdersByStatus(OrderStatus status) {
